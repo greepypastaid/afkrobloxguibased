@@ -1,0 +1,21 @@
+{
+    "mode": "walk_jump",
+    "background_mode": true,
+    "target_title": "Roblox",
+    "countdown_sec": 2,
+    "fish_cast_duration": 0.6217391304347828,
+    "fish_wait_bite": 3.1999999999999993,
+    "fish_reel_duration": 4.199999999999999,
+    "fish_reel_speed": 0.11249999999999999,
+    "fish_post_delay": 1.2,
+    "fish_tap_space": false,
+    "walk_interval": 6.0,
+    "walk_duration": 0.7999999999999998,
+    "pattern": "ping_pong",
+    "jump_chance": 80,
+    "randomize_interval": true,
+    "clicker_interval": 0.23092783505154646,
+    "clicker_button": "left",
+    "spam_key": "e",
+    "spam_interval": 0.49226804123711365
+}
