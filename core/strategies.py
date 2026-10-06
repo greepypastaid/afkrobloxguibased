@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, TYPE_CHECKING
 
 from .constants import AFKMode, WalkPattern, MouseButton
-from .win32_api import is_valid_hwnd
+from .win32_api import is_valid_hwnd, focus_window
 
 if TYPE_CHECKING:
     from afk_engine import AFKEngine
@@ -220,25 +220,27 @@ class WalkJumpStrategy(BaseAFKStrategy):
 
 
 class AutoClickerStrategy(BaseAFKStrategy):
-    """Strategi Auto Clicker berulang."""
+    """
+    Strategi Auto Clicker Global.
+    Klik di posisi kursor saat ini — tidak terikat window apapun.
+    Arahkan kursor ke target lalu tekan Mulai/F6.
+    """
 
     def run_cycle(self, engine: "AFKEngine", hwnd: Optional[int]) -> bool:
         cfg = engine.config
         btn = cfg.clicker_button
         interval = max(0.02, cfg.clicker_interval)
+        btn_label = "Kanan" if str(btn).endswith("right") or btn == "right" else "Kiri"
 
-        if cfg.background_mode:
-            if not hwnd or not is_valid_hwnd(hwnd):
-                hwnd = engine.resolve_target_hwnd()
-            if not hwnd or not is_valid_hwnd(hwnd):
-                engine.log("Jendela Roblox tidak terdeteksi. Menunggu game...")
-                return engine.sleep_interruptible(2.5)
-            engine.bg_controller.click(hwnd, button=btn, hold_time=0.03)
-        else:
-            engine.fg_controller.click(button=btn)
+        # Global clicker: langsung klik di posisi kursor saat ini
+        # Tidak butuh HWND, tidak butuh fokus window, berfungsi di mana saja
+        engine.fg_controller.click(button=btn)
 
         engine.primary_count += 1
+        if engine.primary_count % 10 == 1 or engine.primary_count == 1:
+            engine.log(f"Auto Clicker Global - Klik {btn_label} #{engine.primary_count} (interval: {interval:.2f}s)")
         return engine.sleep_interruptible(interval)
+
 
 
 class KeySpammerStrategy(BaseAFKStrategy):
@@ -249,13 +251,14 @@ class KeySpammerStrategy(BaseAFKStrategy):
         key = cfg.spam_key.strip().lower()
         interval = max(0.05, cfg.spam_interval)
 
-        if cfg.background_mode:
-            if not hwnd or not is_valid_hwnd(hwnd):
-                hwnd = engine.resolve_target_hwnd()
-            if not hwnd or not is_valid_hwnd(hwnd):
-                engine.log("Jendela Roblox tidak terdeteksi. Menunggu game...")
-                return engine.sleep_interruptible(2.5)
+        # Resolve HWND di kedua mode
+        if not hwnd or not is_valid_hwnd(hwnd):
+            hwnd = engine.resolve_target_hwnd()
+        if not hwnd or not is_valid_hwnd(hwnd):
+            engine.log("Jendela Roblox tidak terdeteksi. Menunggu game...")
+            return engine.sleep_interruptible(2.5)
 
+        if cfg.background_mode:
             engine.bg_controller.key_press(hwnd, key, hold_time=0.04)
             engine.bg_controller.pulse_to_window(
                 hwnd,
@@ -263,6 +266,9 @@ class KeySpammerStrategy(BaseAFKStrategy):
                 pulse_time=0.03
             )
         else:
+            # Foreground: fokuskan Roblox terlebih dahulu
+            focus_window(hwnd)
+            time.sleep(0.05)
             engine.fg_controller.press_key(key)
             time.sleep(0.05)
             engine.fg_controller.release_key(key)

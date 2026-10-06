@@ -8,6 +8,7 @@ Mendukung mode Background (PostMessageW) dan Foreground (DirectInput ScanCodes).
 import time
 import threading
 import ctypes
+from ctypes import wintypes
 from typing import Optional, Set
 
 from .constants import (
@@ -24,18 +25,27 @@ from .constants import (
     KEYEVENTF_KEYUP,
     KEYEVENTF_SCANCODE,
     INPUT_KEYBOARD,
+    INPUT_MOUSE,
     SCAN_CODES,
     VK_CODES,
     MouseButton
 )
+
+# Mouse event flags untuk SendInput
+MOUSEEVENTF_LEFTDOWN  = 0x0002
+MOUSEEVENTF_LEFTUP    = 0x0004
+MOUSEEVENTF_RIGHTDOWN = 0x0008
+MOUSEEVENTF_RIGHTUP   = 0x0010
 from .win32_api import (
     user32,
     kernel32,
     is_valid_hwnd,
     ensure_window_restored,
     get_window_client_center,
+    get_window_screen_center,
     Input,
-    KeyBdInput
+    KeyBdInput,
+    MouseInput
 )
 
 # Integrasi opsional pydirectinput
@@ -264,18 +274,60 @@ class ForegroundController:
             )
             user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(inp))
 
-    def click(self, button: MouseButton = MouseButton.LEFT) -> None:
-        """Melakukan klik mouse di foreground."""
+    def click(
+        self,
+        button: MouseButton = MouseButton.LEFT,
+        x: Optional[int] = None,
+        y: Optional[int] = None
+    ) -> None:
+        """
+        Melakukan klik mouse di foreground menggunakan SendInput Win32 API.
+        Jika x, y diberikan: kursor dipindahkan ke koordinat layar tsb sebelum klik,
+        memastikan klik mendarat tepat di dalam jendela game target.
+        """
         is_left = (button == MouseButton.LEFT or button == "left")
+
+        # Pindahkan kursor fisik ke koordinat target jika diberikan
+        if x is not None and y is not None:
+            user32.SetCursorPos(x, y)
+            time.sleep(0.03)  # beri waktu pointer OS untuk pindah
+
+        # Coba pydirectinput terlebih dahulu jika tersedia
         if HAS_PYDIRECTINPUT:
             try:
-                if is_left:
-                    pydirectinput.click()
+                if x is not None and y is not None:
+                    if is_left:
+                        pydirectinput.click(x, y)
+                    else:
+                        pydirectinput.rightClick(x, y)
                 else:
-                    pydirectinput.rightClick()
+                    if is_left:
+                        pydirectinput.click()
+                    else:
+                        pydirectinput.rightClick()
                 return
             except Exception:
                 pass
+
+        # Fallback: gunakan Win32 SendInput langsung (selalu tersedia)
+        down_flag = MOUSEEVENTF_LEFTDOWN if is_left else MOUSEEVENTF_RIGHTDOWN
+        up_flag   = MOUSEEVENTF_LEFTUP   if is_left else MOUSEEVENTF_RIGHTUP
+
+        inp_down = Input(type=INPUT_MOUSE)
+        inp_down.ii.mi = MouseInput(
+            dx=0, dy=0, mouseData=0,
+            dwFlags=down_flag,
+            time=0, dwExtraInfo=0
+        )
+        inp_up = Input(type=INPUT_MOUSE)
+        inp_up.ii.mi = MouseInput(
+            dx=0, dy=0, mouseData=0,
+            dwFlags=up_flag,
+            time=0, dwExtraInfo=0
+        )
+        user32.SendInput(1, ctypes.byref(inp_down), ctypes.sizeof(inp_down))
+        time.sleep(0.02)
+        user32.SendInput(1, ctypes.byref(inp_up), ctypes.sizeof(inp_up))
 
     def release_all(self) -> None:
         """Melepaskan seluruh tombol yang sedang aktif ditekan (Failsafe)."""

@@ -161,7 +161,12 @@ class AFKEngine:
             target_hwnd = self.resolve_target_hwnd()
 
             # 1. Penanganan Jendela & Mode
-            if self.config.background_mode:
+            mode_enum = self.config.mode if isinstance(self.config.mode, AFKMode) else AFKMode(self.config.mode)
+
+            if mode_enum == AFKMode.AUTO_CLICKER:
+                # Auto Clicker bersifat global — tidak perlu window target
+                self.log("Auto Clicker Global aktif. Arahkan kursor ke target lalu bot mulai klik.")
+            elif self.config.background_mode:
                 if target_hwnd:
                     buff = ctypes.create_unicode_buffer(256)
                     user32.GetWindowTextW(target_hwnd, buff, 256)
@@ -172,6 +177,7 @@ class AFKEngine:
                 if target_hwnd:
                     focus_window(target_hwnd)
                     self.log(f"Memfokuskan jendela: HWND {target_hwnd}")
+
 
             # 2. Hitung Mundur
             if self.config.countdown_sec > 0:
@@ -186,8 +192,8 @@ class AFKEngine:
                 return
 
             self.set_state(EngineState.RUNNING)
-            mode_enum = self.config.mode if isinstance(self.config.mode, AFKMode) else AFKMode(self.config.mode)
             self.log(f"Bot aktif di mode: {mode_enum.name}")
+
 
             # 3. Eksekusi Strategi Terpilih (Strategy Pattern)
             strategy: BaseAFKStrategy = create_strategy(mode_enum)
