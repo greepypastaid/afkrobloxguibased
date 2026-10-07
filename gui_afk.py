@@ -193,7 +193,8 @@ class ModernAFKApp(ctk.CTk):
             "Auto Fish",
             "Walk & Jump",
             "Auto Clicker",
-            "Key Spammer"
+            "Key Spammer",
+            "Custom"
         ]
 
         self.seg_mode = ctk.CTkSegmentedButton(
@@ -229,11 +230,13 @@ class ModernAFKApp(ctk.CTk):
         self.panel_walk = ctk.CTkFrame(inner, fg_color="transparent")
         self.panel_clicker = ctk.CTkFrame(inner, fg_color="transparent")
         self.panel_spammer = ctk.CTkFrame(inner, fg_color="transparent")
+        self.panel_custom = ctk.CTkFrame(inner, fg_color="transparent")
 
         self._build_panel_fish()
         self._build_panel_walk()
         self._build_panel_clicker()
         self._build_panel_spammer()
+        self._build_panel_custom()
 
         self.panel_fish.pack(fill="x")
 
@@ -385,6 +388,156 @@ class ModernAFKApp(ctk.CTk):
 
         self._create_slider_row(p, "Interval Tekan:", "spam_int", 0.05, 2.0, 0.50, "s", 2)
 
+    def _build_panel_custom(self) -> None:
+        p = self.panel_custom
+        self.custom_steps_data = []
+
+        # Baris 1: Aksi
+        row1 = ctk.CTkFrame(p, fg_color="transparent")
+        row1.pack(fill="x", pady=(0, 4))
+        ctk.CTkLabel(row1, text="Tipe Aksi:", font=ctk.CTkFont(size=11, weight="bold"), text_color=self.COLOR_TEXT, width=65, anchor="w").pack(side="left")
+        
+        self.opt_action = ctk.CTkOptionMenu(
+            row1,
+            values=["Click", "Tekan Tombol", "Tunggu", "Tahan Tombol", "Lepas Tombol"],
+            height=26, font=ctk.CTkFont(size=11),
+            fg_color=self.COLOR_INPUT, text_color=self.COLOR_TEXT,
+            button_color="#cbd5e1", button_hover_color="#94a3b8", dropdown_fg_color=self.COLOR_CARD,
+            command=self._on_custom_action_change
+        )
+        self.opt_action.pack(side="left", fill="x", expand=True)
+
+        # Baris 2: Input Parameter & Tombol Tambah
+        row2 = ctk.CTkFrame(p, fg_color="transparent")
+        row2.pack(fill="x", pady=(0, 4))
+        
+        ctk.CTkLabel(row2, text="Key:", font=ctk.CTkFont(size=11), text_color=self.COLOR_TEXT).pack(side="left")
+        self.combo_c_key = ctk.CTkComboBox(
+            row2, width=75, height=26, font=ctk.CTkFont(size=11),
+            fg_color=self.COLOR_INPUT, text_color=self.COLOR_TEXT, border_color="#cbd5e1",
+            dropdown_fg_color=self.COLOR_CARD,
+            values=["left", "right", "middle"]
+        )
+        self.combo_c_key.pack(side="left", padx=(4, 8))
+        
+        ctk.CTkLabel(row2, text="Dur (s):", font=ctk.CTkFont(size=11), text_color=self.COLOR_TEXT).pack(side="left")
+        self.entry_c_dur = ctk.CTkEntry(
+            row2, width=50, height=26, font=ctk.CTkFont(size=11), placeholder_text="e.g. 0.5",
+            fg_color=self.COLOR_INPUT, text_color=self.COLOR_TEXT, border_color="#cbd5e1"
+        )
+        self.entry_c_dur.pack(side="left", padx=(4, 8))
+        
+        btn_add = ctk.CTkButton(
+            row2, text="Tambah Langkah", height=26,
+            fg_color=self.COLOR_GREEN, hover_color=self.COLOR_GREEN_HOVER, text_color="#fff",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            command=self._cmd_add_custom_step
+        )
+        btn_add.pack(side="right", fill="x", expand=True)
+
+        # List Area
+        self.scroll_custom = ctk.CTkScrollableFrame(
+            p, height=80, fg_color=self.COLOR_INPUT, corner_radius=6, border_width=1, border_color=self.COLOR_BORDER
+        )
+        self.scroll_custom.pack(fill="x", pady=(0, 4))
+        self._custom_rows = []
+
+        # Baris 3: Hapus Semua
+        row3 = ctk.CTkFrame(p, fg_color="transparent")
+        row3.pack(fill="x")
+        btn_clear = ctk.CTkButton(
+            row3, text="Hapus Semua Langkah", height=24,
+            fg_color=self.COLOR_RED, hover_color=self.COLOR_RED_HOVER, text_color="#fff",
+            font=ctk.CTkFont(size=10, weight="bold"),
+            command=self._cmd_clear_custom_steps
+        )
+        btn_clear.pack(side="right")
+        
+        self._on_custom_action_change(self.opt_action.get())
+
+    def _on_custom_action_change(self, value: str) -> None:
+        if not hasattr(self, 'combo_c_key'):
+            return
+            
+        if value == "Click":
+            self.combo_c_key.configure(values=["left", "right", "middle"], state="normal")
+            self.combo_c_key.set("left")
+        elif value == "Tunggu":
+            self.combo_c_key.configure(values=["-"], state="disabled")
+            self.combo_c_key.set("-")
+        else:
+            self.combo_c_key.configure(
+                values=["w", "a", "s", "d", "space", "e", "f", "enter", "shift", "ctrl"],
+                state="normal"
+            )
+            self.combo_c_key.set("e")
+
+    def _cmd_add_custom_step(self) -> None:
+        action = self.opt_action.get()
+        key = self.combo_c_key.get() if self.combo_c_key.cget("state") == "normal" else ""
+        try:
+            dur_str = self.entry_c_dur.get().replace(",", ".")
+            dur = float(dur_str) if dur_str else 0.0
+        except ValueError:
+            dur = 0.0
+            
+        step = {"action": action, "key": key, "duration": dur}
+        self.custom_steps_data.append(step)
+        self._add_step_ui(step, len(self.custom_steps_data) - 1)
+        self._sync_config_from_ui()
+
+    def _cmd_clear_custom_steps(self) -> None:
+        self.custom_steps_data.clear()
+        for row in self._custom_rows:
+            row.destroy()
+        self._custom_rows.clear()
+        self._sync_config_from_ui()
+
+    def _add_step_ui(self, step: dict, index: int) -> None:
+        row = ctk.CTkFrame(self.scroll_custom, fg_color="transparent")
+        row.pack(fill="x", pady=2)
+        self._custom_rows.append(row)
+        
+        act = step['action']
+        k = step['key']
+        d = step['duration']
+        
+        if act == "Click":
+            lbl_text = f"{index+1}. Klik mouse '{k}'"
+            if d > 0: lbl_text += f" ditahan {d}s"
+        elif act == "Tunggu":
+            lbl_text = f"{index+1}. Tunggu selama {d}s"
+        elif act == "Tekan Tombol":
+            lbl_text = f"{index+1}. Tekan tombol '{k}'"
+            if d > 0: lbl_text += f" ditahan {d}s"
+        elif act == "Tahan Tombol":
+            lbl_text = f"{index+1}. Mulai tahan tombol '{k}'"
+        elif act == "Lepas Tombol":
+            lbl_text = f"{index+1}. Lepas tombol '{k}'"
+        else:
+            lbl_text = f"{index+1}. {act} '{k}' {d}s"
+        
+        ctk.CTkLabel(row, text=lbl_text, font=ctk.CTkFont(size=11), text_color=self.COLOR_TEXT).pack(side="left")
+        
+        def del_cmd(r=row, idx=index):
+            if idx < len(self.custom_steps_data):
+                self.custom_steps_data.pop(idx)
+            r.destroy()
+            self._redraw_custom_list()
+            self._sync_config_from_ui()
+            
+        btn_del = ctk.CTkButton(
+            row, text="x", width=20, height=20, fg_color="#e2e8f0", hover_color="#fca5a5", text_color=self.COLOR_RED,
+            font=ctk.CTkFont(size=10, weight="bold"), command=del_cmd
+        )
+        btn_del.pack(side="right")
+
+    def _redraw_custom_list(self) -> None:
+        for r in self._custom_rows: r.destroy()
+        self._custom_rows.clear()
+        for i, step in enumerate(self.custom_steps_data):
+            self._add_step_ui(step, i)
+
     def _build_action_buttons(self, parent: ctk.CTkFrame) -> None:
         """Tombol Mulai dan Berhenti yang kontras dan jelas."""
         row = ctk.CTkFrame(parent, fg_color="transparent")
@@ -516,6 +669,7 @@ class ModernAFKApp(ctk.CTk):
         self.panel_walk.pack_forget()
         self.panel_clicker.pack_forget()
         self.panel_spammer.pack_forget()
+        self.panel_custom.pack_forget()
 
         if value == "Auto Fish":
             self.panel_fish.pack(fill="x")
@@ -529,6 +683,9 @@ class ModernAFKApp(ctk.CTk):
         elif value == "Key Spammer":
             self.panel_spammer.pack(fill="x")
             self.lbl_counter.configure(text="Tekan: 0")
+        elif value == "Custom":
+            self.panel_custom.pack(fill="x")
+            self.lbl_counter.configure(text="Siklus: 0")
 
     def _refresh_window_list(self) -> None:
         """Mengambil daftar jendela dan memprioritaskan game Roblox asli."""
@@ -574,7 +731,8 @@ class ModernAFKApp(ctk.CTk):
             AFKMode.AUTO_FISH: "Auto Fish",
             AFKMode.WALK_JUMP: "Walk & Jump",
             AFKMode.AUTO_CLICKER: "Auto Clicker",
-            AFKMode.KEY_SPAMMER: "Key Spammer"
+            AFKMode.KEY_SPAMMER: "Key Spammer",
+            AFKMode.CUSTOM_WORKFLOW: "Custom"
         }
         tab_name = mode_map.get(cfg.mode, "Auto Fish")
         self.seg_mode.set(tab_name)
@@ -606,6 +764,9 @@ class ModernAFKApp(ctk.CTk):
         self._set_slider("spam_int", cfg.spam_interval)
         self.entry_spam_key.delete(0, "end")
         self.entry_spam_key.insert(0, cfg.spam_key)
+        
+        self.custom_steps_data = list(cfg.custom_workflow_steps)
+        self._redraw_custom_list()
 
     def _set_slider(self, key: str, val: float) -> None:
         if key in self._slider_vars:
@@ -640,6 +801,8 @@ class ModernAFKApp(ctk.CTk):
             cfg.mode = AFKMode.AUTO_CLICKER
         elif active_tab == "Key Spammer":
             cfg.mode = AFKMode.KEY_SPAMMER
+        elif active_tab == "Custom":
+            cfg.mode = AFKMode.CUSTOM_WORKFLOW
 
         cfg.background_mode = bool(self.switch_bg_mode.get())
 
@@ -669,6 +832,9 @@ class ModernAFKApp(ctk.CTk):
         if "spam_int" in self._slider_vars:
             cfg.spam_interval = float(self._slider_vars["spam_int"][0].get())
         cfg.spam_key = self.entry_spam_key.get().strip() or "e"
+
+        if hasattr(self, 'custom_steps_data'):
+            cfg.custom_workflow_steps = list(self.custom_steps_data)
 
         cfg.save_to_file(CONFIG_PATH)
 
@@ -753,6 +919,8 @@ class ModernAFKApp(ctk.CTk):
             self.lbl_counter.configure(text=f"Klik: {primary}")
         elif mode == AFKMode.KEY_SPAMMER:
             self.lbl_counter.configure(text=f"Tekan: {primary}")
+        elif mode == AFKMode.CUSTOM_WORKFLOW:
+            self.lbl_counter.configure(text=f"Siklus: {secondary}")
 
     def on_close(self) -> None:
         if self.engine.is_running():

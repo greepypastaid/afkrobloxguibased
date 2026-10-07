@@ -47,6 +47,9 @@ class AFKConfig:
     spam_key: str = "e"                 # Tombol yang di-spam (e, f, space, dll)
     spam_interval: float = 0.5          # Interval penekanan tombol (s)
 
+    # Pengaturan Custom Workflow
+    custom_workflow_steps: list = field(default_factory=list)
+
     def to_dict(self) -> Dict[str, Any]:
         """Konversi konfigurasi ke format dictionary serializable."""
         data = asdict(self)

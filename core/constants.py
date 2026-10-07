@@ -15,6 +15,7 @@ class AFKMode(str, Enum):
     WALK_JUMP = "walk_jump"
     AUTO_CLICKER = "auto_clicker"
     KEY_SPAMMER = "key_spammer"
+    CUSTOM_WORKFLOW = "custom_workflow"
 
     @classmethod
     def display_name(cls, mode: "AFKMode") -> str:
@@ -22,7 +23,8 @@ class AFKMode(str, Enum):
             cls.AUTO_FISH: "Auto Fish",
             cls.WALK_JUMP: "Walk & Jump",
             cls.AUTO_CLICKER: "Auto Clicker",
-            cls.KEY_SPAMMER: "Key Spammer"
+            cls.KEY_SPAMMER: "Key Spammer",
+            cls.CUSTOM_WORKFLOW: "Custom"
         }
         return names.get(mode, mode.value)
 

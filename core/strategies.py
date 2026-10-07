@@ -277,6 +277,91 @@ class KeySpammerStrategy(BaseAFKStrategy):
         return engine.sleep_interruptible(interval)
 
 
+class CustomWorkflowStrategy(BaseAFKStrategy):
+    """Strategi yang menjalankan langkah-langkah kustom dari pengguna."""
+
+    def run_cycle(self, engine: "AFKEngine", hwnd: Optional[int]) -> bool:
+        cfg = engine.config
+        steps = cfg.custom_workflow_steps
+        
+        if not steps:
+            engine.log("Custom Workflow kosong! Silakan tambahkan langkah di GUI.")
+            return engine.sleep_interruptible(2.0)
+            
+        # Resolve HWND di kedua mode
+        if not hwnd or not is_valid_hwnd(hwnd):
+            hwnd = engine.resolve_target_hwnd()
+        if cfg.background_mode and (not hwnd or not is_valid_hwnd(hwnd)):
+            engine.log("Jendela Roblox tidak terdeteksi. Menunggu game...")
+            return engine.sleep_interruptible(2.5)
+
+        for i, step in enumerate(steps):
+            if engine.stop_requested:
+                return False
+                
+            action = step.get("action", "")
+            key = step.get("key", "").lower().strip()
+            duration = float(step.get("duration", 0.0))
+            
+            if action == "Click":
+                btn = MouseButton.RIGHT if key == "right" else MouseButton.LEFT
+                engine.log(f"Langkah {i+1}: Klik {btn.value}")
+                if cfg.background_mode:
+                    engine.bg_controller.click(hwnd, button=btn, hold_time=max(0.01, duration))
+                else:
+                    engine.fg_controller.click(button=btn)
+                    if duration > 0:
+                        engine.sleep_interruptible(duration)
+                engine.primary_count += 1
+                
+            elif action == "Tekan Tombol":
+                if not key:
+                    continue
+                engine.log(f"Langkah {i+1}: Tekan '{key}'")
+                if cfg.background_mode:
+                    engine.bg_controller.key_press(hwnd, key, hold_time=max(0.04, duration))
+                    engine.bg_controller.pulse_to_window(
+                        hwnd,
+                        lambda: (engine.fg_controller.press_key(key), time.sleep(max(0.03, duration)), engine.fg_controller.release_key(key)),
+                        pulse_time=max(0.03, duration)
+                    )
+                else:
+                    focus_window(hwnd)
+                    engine.fg_controller.press_key(key)
+                    if duration > 0:
+                        engine.sleep_interruptible(duration)
+                    else:
+                        time.sleep(0.05)
+                    engine.fg_controller.release_key(key)
+                engine.primary_count += 1
+                
+            elif action == "Tunggu":
+                engine.log(f"Langkah {i+1}: Menunggu {duration}s")
+                if not engine.sleep_interruptible(duration):
+                    return False
+                    
+            elif action == "Tahan Tombol":
+                if not key: continue
+                engine.log(f"Langkah {i+1}: Menahan '{key}'")
+                if not cfg.background_mode:
+                    focus_window(hwnd)
+                    engine.fg_controller.press_key(key)
+                else:
+                    engine.log("Tahan tombol continuous kurang didukung di Background.")
+                    
+            elif action == "Lepas Tombol":
+                if not key: continue
+                engine.log(f"Langkah {i+1}: Melepas '{key}'")
+                if not cfg.background_mode:
+                    engine.fg_controller.release_key(key)
+                    
+            # Jeda antar langkah sangat singkat, default Windows sleep min
+            time.sleep(0.005)
+                    
+        engine.secondary_count += 1 # Loop count
+        return True
+
+
 def create_strategy(mode: AFKMode) -> BaseAFKStrategy:
     """Factory function untuk menghasilkan strategi berdasarkan mode."""
     strategies = {
@@ -284,6 +369,7 @@ def create_strategy(mode: AFKMode) -> BaseAFKStrategy:
         AFKMode.WALK_JUMP: WalkJumpStrategy,
         AFKMode.AUTO_CLICKER: AutoClickerStrategy,
         AFKMode.KEY_SPAMMER: KeySpammerStrategy,
+        AFKMode.CUSTOM_WORKFLOW: CustomWorkflowStrategy,
     }
     strategy_cls = strategies.get(mode, AutoFishStrategy)
     return strategy_cls()

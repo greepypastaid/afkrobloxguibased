@@ -17,5 +17,12 @@
     "clicker_interval": 0.1706185567010312,
     "clicker_button": "left",
     "spam_key": "e",
-    "spam_interval": 0.050000000000000266
+    "spam_interval": 0.13041237113402082,
+    "custom_workflow_steps": [
+        {
+            "action": "Click",
+            "key": "",
+            "duration": 0.0
+        }
+    ]
 }
